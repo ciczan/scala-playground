@@ -55,6 +55,44 @@ case class Some[+A](get: A) extends Option[A]
 case object None extends Option[Nothing]
 
 
+sealed trait Feither[+E, +A] {
+
+  /**
+    * Exercise 4.6
+    */
+  def map[B](f: A => B): Feither[E, B] = this match {
+    case l : FLeft[E] => l
+    case r: FRight[A] => FRight(f(r.value))
+  }
+
+  /**
+    * Exercise 4.6
+    */
+  def flatMap[EE >: E, B](f: A => Feither[EE, B]): Feither[EE, B] = this match {
+    case l : FLeft[E] => l
+    case r: FRight[A] => f(r.value)
+  }
+
+  /**
+    * Exercise 4.6
+    */
+  def orElse[EE >: E, B >: A](b: Feither[EE, B]): Feither[EE, B] = this match {
+    case _ : FLeft[E] => b
+    case r: FRight[A] => r
+  }
+
+  /**
+    * Exercise 4.6
+    */
+  def map2[EE >: E, B, C](b: Feither[EE, B])(f: (A, B) => C): Feither[EE, C] = {
+    this flatMap {aa => b.map(bb => f(aa, bb))}
+  }
+
+
+
+}
+case class FLeft[+E](value: E) extends Feither[E, Nothing]
+case class FRight[+A](value: A) extends Feither[Nothing, A]
 
 object Chapter4Options {
 
@@ -118,6 +156,32 @@ object Chapter4Options {
     case h :: t => map2(f(h), traverse(t)(f))( _ :: _)
   }
 
+  def meanEither(xs: IndexedSeq[Double]): Feither[String, Double] = {
+    if (xs.isEmpty) FLeft("List is Empty")
+    else FRight(xs.sum / xs.length)
+  }
 
+  def safeDiv(x: Int, y: Int): Feither[Exception, Double] = {
+    try FRight(x /y)
+    catch { case e: Exception => FLeft(e)}
+  }
+
+  def TryEither[A](a: => A): Feither[Exception, A] =
+    try {FRight(a)}
+    catch {case e: Exception => FLeft(e)}
+
+
+  def traverseE[E, A, B](as: List[A])(f: A => Feither[E, B]): Feither[E, List[B]] = as match {
+    case Nil => FRight(Nil)
+    case Cons(h, t) => f(h).map2(traverseE(t)(f))(Cons(_, _))
+  }
+
+  def sequence[E, A](es: List[Feither[E, A]]): Feither[E, List[A]] = {
+    traverseE(es)(xw => xw)
+  }
+
+  def main(args: Array[String]) = {
+    println(safeDiv(3, 0))
+  }
 
 }
